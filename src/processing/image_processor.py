@@ -283,18 +283,25 @@ class ImageProcessorWithEmbedding:
     def _add_to_cache(self, url: str, data: bytes):
         """Добавить данные в кэш с контролем памяти"""
         data_size = len(data)
-        # Проверяем, поместится ли в кэш
-        if data_size > self.cache_max_bytes * 0.1:  # Не кэшируем файлы >10% от размера кэша
+        
+        # Не кэшируем слишком большие файлы
+        if data_size > self.cache_max_bytes * 0.1:
             return
-        # Освобождаем место если нужно
-        while self.cache_current_bytes + data_size > self.cache_max_bytes and self.cache:
-            oldest_url = next(iter(self.cache))
-            oldest_data = self.cache[oldest_url]
-            self.cache_current_bytes -= len(oldest_data)
-            self.cache.pop(oldest_url)
-        # Добавляем в кэш
-        self.cache[url] = data
-        self.cache_current_bytes += data_size
+            
+        # Проверяем, поместится ли в текущий кэш
+        if self.cache_current_bytes + data_size > self.cache_max_bytes:
+            # Освобождаем место пока не хватит
+            while (self.cache_current_bytes + data_size > self.cache_max_bytes 
+                   and self.cache):
+                oldest_url = next(iter(self.cache))
+                oldest_data = self.cache[oldest_url]
+                self.cache_current_bytes -= len(oldest_data)
+                self.cache.pop(oldest_url)
+        
+        # Добавляем только если после очистки есть место
+        if self.cache_current_bytes + data_size <= self.cache_max_bytes:
+            self.cache[url] = data
+            self.cache_current_bytes += data_size
 
     def _process_and_embed_image_sync(self, image_data: bytes, url_hash: str) -> Tuple[Optional[str], Optional[str], Optional[Dict]]:
         """Синхронная обработка изображения и создание base64 (оптимизированная)"""
