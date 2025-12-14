@@ -11,6 +11,7 @@ import platform
 import ctypes
 import time
 import hashlib
+import threading
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from functools import lru_cache
@@ -695,29 +696,33 @@ class PerformanceProfiler:
         }
 
 # Глобальные экземпляры для повторного использования
+_singleton_lock = threading.Lock()
 _system_optimizer = None
 _memory_optimizer = None
 _performance_profiler = None
 
 def get_system_optimizer() -> SystemOptimizer:
-    """Получить глобальный экземпляр оптимизатора системы"""
+    """Получить глобальный экземпляр оптимизатора системы (thread-safe)"""
     global _system_optimizer
-    if _system_optimizer is None:
-        _system_optimizer = SystemOptimizer()
+    with _singleton_lock:
+        if _system_optimizer is None:
+            _system_optimizer = SystemOptimizer()
     return _system_optimizer
 
 def get_memory_optimizer() -> MemoryOptimizer:
-    """Получить глобальный экземпляр оптимизатора памяти"""
+    """Получить глобальный экземпляр оптимизатора памяти (thread-safe)"""
     global _memory_optimizer
-    if _memory_optimizer is None:
-        _memory_optimizer = MemoryOptimizer()
+    with _singleton_lock:
+        if _memory_optimizer is None:
+            _memory_optimizer = MemoryOptimizer()
     return _memory_optimizer
 
 def get_performance_profiler() -> PerformanceProfiler:
-    """Получить глобальный экземпляр профайлера"""
+    """Получить глобальный экземпляр профайлера (thread-safe)"""
     global _performance_profiler
-    if _performance_profiler is None:
-        _performance_profiler = PerformanceProfiler()
+    with _singleton_lock:
+        if _performance_profiler is None:
+            _performance_profiler = PerformanceProfiler()
     return _performance_profiler
 
 async def optimize_for_file_size(file_size_gb: float) -> Dict[str, Any]:

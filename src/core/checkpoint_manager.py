@@ -55,6 +55,47 @@ class CheckpointManager:
         self.state: Optional[CheckpointState] = None
         self.last_save = 0.0
     
+    def validate_checkpoint_integrity(self, checkpoint_data: dict) -> bool:
+        """Проверить целостность данных чекпоинта"""
+        required_fields = {
+            'file_name', 'total_lines', 'processed_lines', 
+            'last_position', 'timestamp', 'batch_size'
+        }
+        
+        # Проверка наличия обязательных полей
+        if not all(field in checkpoint_data for field in required_fields):
+            print("⚠️ Чекпоинт отсутствуют обязательные поля")
+            return False
+            
+        # Проверка типов данных
+        try:
+            if not isinstance(checkpoint_data['processed_lines'], (int, float)):
+                print("⚠️ Некорректный тип processed_lines")
+                return False
+            if checkpoint_data['processed_lines'] > checkpoint_data['total_lines']:
+                print(f"⚠️ Обработано строк ({checkpoint_data['processed_lines']:,}) > всего строк ({checkpoint_data['total_lines']:,})")
+                return False
+            if checkpoint_data['last_position'] < 0:
+                print(f"⚠️ Некорректная позиция: {checkpoint_data['last_position']:,}")
+                return False
+                
+            # Проверка возраста чекпоинта (не старше 7 дней)
+            checkpoint_age = time.time() - checkpoint_data['timestamp']
+            if checkpoint_age > 7 * 24 * 3600:
+                print(f"⚠️ Чекпоинт слишком стар: {checkpoint_age/3600:.1f} часов")
+                # Не возвращаем False, но предупреждаем
+                
+            # Проверка размера батча в разумных пределах
+            if not (100 <= checkpoint_data['batch_size'] <= 50000):
+                print(f"⚠️ Некорректный размер батча: {checkpoint_data['batch_size']:,}")
+                checkpoint_data['batch_size'] = Config.INITIAL_BATCH_SIZE
+                
+        except (TypeError, KeyError, ValueError) as e:
+            print(f"⚠️ Ошибка валидации чекпоинта: {e}")
+            return False
+            
+        return True
+
     def load_checkpoint(self) -> Optional[CheckpointState]:
         """Загрузить состояние чекпоинта"""
         # Пробуем загрузить из основного файла
@@ -62,6 +103,11 @@ class CheckpointManager:
             try:
                 with open(self.checkpoint_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
+                
+                # Валидация целостности данных
+                if not self.validate_checkpoint_integrity(data):
+                    print("⚠️ Проверка целостности данных чекпоинта не пройдена")
+                    return self._load_backup_checkpoint()
                 
                 # Фильтруем только поля, которые есть в CheckpointState
                 checkpoint_fields = {f.name for f in fields(CheckpointState)}
@@ -72,12 +118,11 @@ class CheckpointManager:
                 print(f"📌 Последняя позиция: {self.state.last_position:,} байт")
                 print(f"📌 Размер батча: {self.state.batch_size:,}")
                 return self.state
+                
             except (json.JSONDecodeError, KeyError, TypeError) as e:
                 print(f"⚠️ Ошибка загрузки основного чекпоинта: {e}")
-                # Пробуем загрузить из резервной копии
                 return self._load_backup_checkpoint()
         
-        # Пробуем загрузить из резервной копии
         return self._load_backup_checkpoint()
     
     def _load_backup_checkpoint(self) -> Optional[CheckpointState]:

@@ -192,6 +192,8 @@ class OptimizedBatchProcessor:
         self.metrics = metrics
         self.batch_results = []
         self.last_memory_check = time.time()
+        # Добавляем блокировку для защиты общих ресурсов
+        self.memory_lock = asyncio.Lock()
 
     async def process_batch_optimized(self, batch_data: List[Tuple[str, str]], 
                                       current_position: int) -> List[FaceRecord]:
@@ -280,30 +282,31 @@ class OptimizedBatchProcessor:
 
     async def _check_memory_and_adjust(self):
         """Проверить память и при необходимости приостановить обработку"""
-        current_time = time.time()
-        # Проверяем не чаще чем раз в 5 секунд (увеличили интервал)
-        if current_time - self.last_memory_check < 5:
-            return
+        async with self.memory_lock:  # Защита блокировкой
+            current_time = time.time()
+            # Проверяем не чаще чем раз в 5 секунд (увеличили интервал)
+            if current_time - self.last_memory_check < 5:
+                return
 
-        self.last_memory_check = current_time
-        try:
-            memory_percent = psutil.virtual_memory().percent
-            available_gb = psutil.virtual_memory().available / (1024**3)
+            self.last_memory_check = current_time
+            try:
+                memory_percent = psutil.virtual_memory().percent
+                available_gb = psutil.virtual_memory().available / (1024**3)
 
-            # Критическое использование памяти
-            if memory_percent > 90 or available_gb < 0.2:
-                logger.warning(f"Критическое использование памяти: {memory_percent:.1f}%, {available_gb:.2f}GB свободно")
-                await asyncio.sleep(5)
-                gc.collect()
-            elif memory_percent > 80 or available_gb < 0.5:
-                logger.debug(f"Высокое использование памяти: {memory_percent:.1f}%")
-                await asyncio.sleep(1)
-                gc.collect()
-            elif memory_percent > 70:
-                await asyncio.sleep(0.5)
+                # Критическое использование памяти
+                if memory_percent > 90 or available_gb < 0.2:
+                    logger.warning(f"Критическое использование памяти: {memory_percent:.1f}%, {available_gb:.2f}GB свободно")
+                    await asyncio.sleep(5)
+                    gc.collect()
+                elif memory_percent > 80 or available_gb < 0.5:
+                    logger.debug(f"Высокое использование памяти: {memory_percent:.1f}%")
+                    await asyncio.sleep(1)
+                    gc.collect()
+                elif memory_percent > 70:
+                    await asyncio.sleep(0.5)
 
-        except Exception as e:
-            logger.debug(f"Ошибка проверки памяти: {e}")
+            except Exception as e:
+                logger.debug(f"Ошибка проверки памяти: {e}")
 
     def _create_fallback_records(self, batch_data: List[Tuple[str, str]]) -> List[FaceRecord]:
         """Создать записи без изображений в случае ошибки"""
@@ -430,6 +433,8 @@ class OptimizedFaceRecognitionProcessor:
             'image_processing_speed': 0,
             'total_records_processed': 0
         }
+        # Блокировка для защиты общих ресурсов
+        self.memory_lock = asyncio.Lock()
         logger.info(f"Инициализирован OptimizedFaceRecognitionProcessor с batch_size={self.batch_size}")
 
     async def _load_checkpoint_state(self, input_file: str, total_lines: int) -> Tuple[int, Dict[str, Any]]:
@@ -726,27 +731,28 @@ class OptimizedFaceRecognitionProcessor:
 
     async def _optimize_memory_usage(self):
         """Оптимизация использования памяти"""
-        try:
-            # Очистка кэша парсера если он слишком большой
-            parser = get_global_parser()
-            if parser and hasattr(parser, '_cache'):
-                cache_size = len(parser._cache)
-                if cache_size > 25000:  # Увеличили порог
-                    parser.clear_cache()
-                    logger.debug(f"Очищен кэш парсера (было {cache_size} записей)")
+        async with self.memory_lock:  # Защита блокировкой
+            try:
+                # Очистка кэша парсера если он слишком большой
+                parser = get_global_parser()
+                if parser and hasattr(parser, '_cache'):
+                    cache_size = len(parser._cache)
+                    if cache_size > 25000:  # Увеличили порог
+                        parser.clear_cache()
+                        logger.debug(f"Очищен кэш парсера (было {cache_size} записей)")
 
-            # Принудительный сбор мусора
-            collected = gc.collect()
-            logger.debug(f"Собрано мусора: {collected} объектов")
+                # Принудительный сбор мусора
+                collected = gc.collect()
+                logger.debug(f"Собрано мусора: {collected} объектов")
 
-            # Проверка памяти и приостановка если нужно
-            memory_percent = psutil.virtual_memory().percent
-            if memory_percent > 85:
-                logger.warning(f"Высокое использование памяти ({memory_percent}%), пауза 2 секунды")
-                await asyncio.sleep(2)
+                # Проверка памяти и приостановка если нужно
+                memory_percent = psutil.virtual_memory().percent
+                if memory_percent > 85:
+                    logger.warning(f"Высокое использование памяти ({memory_percent}%), пауза 2 секунды")
+                    await asyncio.sleep(2)
 
-        except Exception as e:
-            logger.debug(f"Ошибка оптимизации памяти: {e}")
+            except Exception as e:
+                logger.debug(f"Ошибка оптимизации памяти: {e}")
 
     async def _save_records_intermediate(self):
         """Промежуточное сохранение записей для экономии памяти"""

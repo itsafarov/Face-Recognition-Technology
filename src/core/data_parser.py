@@ -266,11 +266,18 @@ class DataParser:
             
         except JSON.JSONDecodeError as e:
             metrics.json_errors += 1
-            logger.debug(f"JSON decode error: {e} for line: {line[:100]}...")
+            if logger.isEnabledFor(10):  # DEBUG level
+                logger.debug(f"JSON decode error: {e} for line: {line[:100]}...")
+            return None
+        except UnicodeDecodeError as e:
+            logger.error(f"Unicode decode error: {e}")
+            metrics.json_errors += 1
             return None
         except Exception as e:
-            logger.error(f"Ошибка парсинга записи: {e}")
-            logger.debug(f"Problematic line: {line[:200]}...")
+            logger.error(f"Unexpected parsing error: {e}")
+            # Перевыбрасываем критические ошибки для диагностики
+            if not isinstance(e, (MemoryError, KeyboardInterrupt, SystemExit)):
+                raise
             return None
     
     def parse_records_batch(self, lines: List[str], metrics: ProcessingMetrics) -> List[Dict]:
