@@ -1,9 +1,17 @@
 ```
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -21,34 +29,35 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments
-venv/
-env/
-ENV/
-.venv/
-.env/
+# Pytest
+.venv
+.coverage
+htmlcov/
+.coverage.*
+.cache
+.pytest_cache/
+
+# Mypy
+.mypy_cache/
+
+# Environment variables
+.env
+.venv
+.env.local
+.env.*
 
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
+
+# OS
+.DS_Store
+Thumbs.db
 
 # Logs
 *.log
 
-# Environment
-.env
-.env.local
-*.env.*
-
 # Coverage
-.coverage
 coverage/
 htmlcov/
-
-# Temporary files
-*.tmp
-.DS_Store
-Thumbs.db
 ```
