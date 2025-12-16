@@ -18,9 +18,9 @@ from functools import lru_cache
 from collections import OrderedDict
 
 from core.config import Config
-from utils.logger import setup_logging
+from utils.logger import setup_logger
 
-logger = setup_logging()
+logger = setup_logger()
 
 @dataclass
 class OptimizationConfig:

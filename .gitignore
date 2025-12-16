@@ -1,63 +1,38 @@
 ```
-# Python
-__pycache__/
+# Compiled and build artifacts
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
+__pycache__/
+*.o
+*.obj
+
+# Dependencies
 .venv/
-pip-log.txt
-pip-delete-this-directory.txt
+venv/
+node_modules/
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# Logs and temp files
+*.log
+*.tmp
+*.swp
 
-# Pytest
-.venv
-.coverage
-htmlcov/
-.coverage.*
-.cache
-.pytest_cache/
-
-# Mypy
-.mypy_cache/
-
-# Environment variables
+# Environment
 .env
-.venv
 .env.local
-.env.*
+*.env.*
 
-# IDE
+# Editors
 .vscode/
 .idea/
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Coverage
+# Coverage reports
+.coverage
 coverage/
 htmlcov/
+
+# Python specific
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg-info/
 ```

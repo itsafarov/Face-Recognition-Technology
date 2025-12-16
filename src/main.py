@@ -16,8 +16,11 @@ import psutil
 
 # Add modules path
 current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 # Import modules
 from core.config import Config
@@ -27,7 +30,7 @@ from core.optimizer import (
     get_system_optimizer,
     get_memory_optimizer
 )
-from utils.logger import setup_logging
+from utils.logger import setup_logger
 from utils.helpers import (
     print_banner,
     select_file,
@@ -43,7 +46,7 @@ from core.processor import FaceRecognitionProcessor
 from core.optimized_processor import get_optimized_processor
 
 # Setup logging
-logger = setup_logging()
+logger = setup_logger()
 
 def parse_arguments():
     """Parse command line arguments with extended options"""
