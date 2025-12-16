@@ -586,7 +586,7 @@ class FaceRecord:
             reason_text = "Не загружено"
         
         # Определяем цвет плашки в зависимости от причины
-        failed_lower = self.failed_reason.lower()
+        failed_lower = str(self.failed_reason).lower()
         if "timeout" in failed_lower or "time out" in failed_lower:
             bg_color = "#fff3e0"  # Оранжевый для таймаутов
             icon = "⏱️"
@@ -975,7 +975,7 @@ class ExtendedFaceRecord(FaceRecord):
         if not self.request_type:
             return "Не указан"
         
-        rt_lower = self.request_type.lower()
+        rt_lower = str(self.request_type).lower()
         if rt_lower in ['1', 'recognition', 'face', 'face_recognition']:
             return "Распознавание"
         elif rt_lower in ['2', 'event']:

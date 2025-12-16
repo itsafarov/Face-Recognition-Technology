@@ -599,7 +599,9 @@ class OptimizedFaceRecognitionProcessor:
                             batch_data, 
                             current_position, 
                             batch_count, 
-                            batch_start_time
+                            batch_start_time,
+                            input_file,
+                            total_lines
                         )
                         
                         batch_data = []
@@ -617,7 +619,9 @@ class OptimizedFaceRecognitionProcessor:
                         batch_data, 
                         current_position, 
                         batch_count, 
-                        batch_start_time
+                        batch_start_time,
+                        input_file,
+                        total_lines
                     )
             
             return True
@@ -629,7 +633,9 @@ class OptimizedFaceRecognitionProcessor:
     async def _process_batch(self, batch_data: List[Tuple[str, str]], 
                            current_position: int, 
                            batch_count: int,
-                           batch_start_time: float):
+                           batch_start_time: float,
+                           input_file: str = None,
+                           total_lines: int = 0):
         """Обработать батч и обновить состояние"""
         # Обработка батча
         batch_records = await self.batch_processor.process_batch(batch_data)
@@ -1072,6 +1078,24 @@ class OptimizedFaceRecognitionProcessor:
             
         except Exception as e:
             logger.error(f"Ошибка при финальной очистке: {e}")
+
+    def get_performance_report(self) -> Dict[str, Any]:
+        """Получить отчет о производительности"""
+        memory_stats = self.memory_manager.get_statistics()
+        
+        return {
+            'total_processed': self.metrics.processed_records,
+            'total_records': self.metrics.total_records,
+            'valid_images': self.metrics.valid_images,
+            'failed_images': self.metrics.failed_images,
+            'duplicate_records': self.metrics.duplicate_records,
+            'peak_memory_gb': memory_stats['peak_memory_gb'],
+            'avg_memory_percent': memory_stats['avg_memory_percent'],
+            'current_memory_percent': memory_stats['current_memory_percent'],
+            'processing_speed_avg': self.progress_stats.records_per_second,
+            'total_time_seconds': time.time() - self.progress_stats.start_time,
+            'memory_samples_count': memory_stats['samples_count']
+        }
 
 
 def get_optimized_processor(formats: List[str], resume: bool = False) -> OptimizedFaceRecognitionProcessor:
