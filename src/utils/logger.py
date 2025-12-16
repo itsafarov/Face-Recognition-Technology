@@ -1,5 +1,5 @@
 """
-Настройка системы логирования
+Logging system configuration
 """
 
 import os
@@ -7,15 +7,15 @@ import logging
 import platform
 
 def setup_logging():
-    """Настройка системы логирования"""
-    # Очищаем существующие обработчики
+    """Setup logging system"""
+    # Clear existing handlers
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
     
     logger = logging.getLogger("FaceRecognitionProcessor")
     logger.setLevel(logging.INFO)
     
-    # Удаляем существующие обработчики у логгера
+    # Clear existing handlers from logger
     logger.handlers.clear()
     
     class ColorFormatter(logging.Formatter):
@@ -52,3 +52,6 @@ def setup_logging():
     logger.addHandler(file_handler)
     
     return logger
+
+# Alias function to match expected import
+setup_logger = setup_logging

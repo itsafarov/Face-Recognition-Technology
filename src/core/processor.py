@@ -27,16 +27,19 @@ from .data_parser import parse_batch_records, get_global_parser
 from .checkpoint_manager import CheckpointManager
 from .statistics import StatisticsAnalyzer
 try:
-    # Попытка импорта для запуска из папки src
-    from processing.image_processor import ImageProcessorWithEmbedding, process_images_batch
-except ImportError:
-    # Попытка импорта для запуска из корня
-    from src.processing.image_processor import ImageProcessorWithEmbedding, process_images_batch
-from src.utils.logger import setup_logging
+    # Relative import when used as part of package
+    from ..processing.image_processor import ImageProcessorWithEmbedding, process_images_batch
+except (ImportError, ValueError):
+    # Absolute import when running directly
+    try:
+        from processing.image_processor import ImageProcessorWithEmbedding, process_images_batch
+    except ImportError:
+        from src.processing.image_processor import ImageProcessorWithEmbedding, process_images_batch
+from src.utils.logger import setup_logger
 from src.utils.memory_monitor import MemoryMonitor
 from src.utils.windows_paths import get_windows_safe_path, enable_windows_long_paths
 
-logger = setup_logging()
+logger = setup_logger()
 
 
 class OptimizedProgressTracker:
