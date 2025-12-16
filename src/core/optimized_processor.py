@@ -23,7 +23,7 @@ from .config import Config
 from .models import ProcessingMetrics, FaceRecord
 from .data_parser import parse_batch_records, get_global_parser
 from .checkpoint_manager import CheckpointManager
-from processing.image_processor import ImageProcessorWithEmbedding, process_images_batch
+from processing.image_processor import ImageProcessorWithEmbedding, process_images_batch, process_images_batch_simple
 from processing.report_generator import ReportGenerator
 from src.utils.logger import setup_logger
 from src.utils.memory_monitor import MemoryMonitor
@@ -201,9 +201,10 @@ class BatchProcessor:
             image_results = []
             if image_urls:
                 try:
-                    image_results = await process_images_batch(
-                        self.image_processor,
+                    # Use the simple version that doesn't pass the processor object to avoid SSLContext pickling issues
+                    image_results = await process_images_batch_simple(
                         image_urls,
+                        self.image_processor.base_dir,
                         self.metrics
                     )
                 except Exception as e:

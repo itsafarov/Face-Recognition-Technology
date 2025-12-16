@@ -558,105 +558,6 @@ class ImageProcessorWithEmbedding:
             diagnostics.add_error(f"All download attempts failed: {str(e)[:50]}")
             return None, diagnostics
     
-    def _process_image_sync(self, image_data: bytes, url_hash: str) -> Optional[ImageProcessingResult]:
-        """Синхронная обработка изображения (выполняется в отдельном процессе)"""
-        start_time = time.time()
-        
-        try:
-            # Декодирование через OpenCV
-            nparr = np.frombuffer(image_data, np.uint8)
-            img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            
-            if img_np is None:
-                # Попытка через PIL как запасной вариант
-                try:
-                    with Image.open(BytesIO(image_data)) as img_pil:
-                        # Конвертация в RGB
-                        if img_pil.mode in ('RGBA', 'LA', 'P'):
-                            if img_pil.mode == 'RGBA':
-                                background = Image.new('RGB', img_pil.size, (255, 255, 255))
-                                background.paste(img_pil, mask=img_pil.split()[3])
-                                img_pil = background
-                            else:
-                                img_pil = img_pil.convert('RGB')
-                        elif img_pil.mode != 'RGB':
-                            img_pil = img_pil.convert('RGB')
-                        
-                        img_np = np.array(img_pil)
-                        img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-                except Exception as e:
-                    logger.debug(f"PIL decode failed: {e}")
-                    return None
-            
-            # Проверка валидности
-            if img_np.size == 0 or img_np.shape[0] == 0 or img_np.shape[1] == 0:
-                return None
-            
-            # Получаем размеры
-            height, width = img_np.shape[:2]
-            
-            # Масштабирование очень больших изображений
-            if width > 5000 or height > 5000:
-                scale = min(5000 / width, 5000 / height)
-                new_width = int(width * scale)
-                new_height = int(height * scale)
-                img_np = cv2.resize(img_np, (new_width, new_height), cv2.INTER_AREA)
-                height, width = img_np.shape[:2]
-            
-            # Создание миниатюры
-            thumbnail_size = self.config.thumbnail_size
-            scale = min(thumbnail_size[0] / width, thumbnail_size[1] / height, 1.0)
-            new_width = int(width * scale)
-            new_height = int(height * scale)
-            
-            # Выбор интерполяции
-            interpolation = cv2.INTER_AREA if scale < 0.5 else cv2.INTER_LINEAR
-            img_resized = cv2.resize(img_np, (new_width, new_height), interpolation=interpolation)
-            
-            # Кодирование в base64
-            success, buffer = cv2.imencode('.jpg', img_resized, [
-                cv2.IMWRITE_JPEG_QUALITY, 85,
-                cv2.IMWRITE_JPEG_OPTIMIZE, 1
-            ])
-            
-            if not success:
-                return None
-            
-            base64_str = base64.b64encode(buffer.tobytes()).decode('utf-8')
-            
-            # Сохранение оригинального изображения
-            timestamp = int(time.time() * 1000)
-            filename = f"photo_{url_hash}_{timestamp}.jpg"
-            filepath = os.path.join(self.images_dir, filename)
-            
-            cv2.imwrite(filepath, img_np, self.compression_params)
-            
-            # Сохранение в кэш на диске (только для небольших изображений)
-            if width <= 2000 and height <= 2000:
-                cache_filename = f"cache_{url_hash}.jpg"
-                cache_path = os.path.join(self.disk_cache_dir, cache_filename)
-                cv2.imwrite(cache_path, img_np, self.compression_params)
-            
-            # Получение размера файла
-            file_size_kb = os.path.getsize(filepath) / 1024
-            processing_time = time.time() - start_time
-            
-            return ImageProcessingResult(
-                filepath=filepath,
-                base64_str=base64_str,
-                image_info={
-                    "width": width,
-                    "height": height,
-                    "file_size_kb": file_size_kb,
-                    "original_size": len(image_data),
-                    "processing_time": processing_time,
-                    "thumbnail_size": (new_width, new_height)
-                }
-            )
-            
-        except Exception as e:
-            logger.debug(f"Error processing image {url_hash[:8]}: {e}")
-            return None
     
     async def process_image(self, url: str, metrics: ProcessingMetrics) -> ImageProcessingResult:
         """
@@ -834,9 +735,11 @@ class ImageProcessorWithEmbedding:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
             self.process_pool,
-            self._process_image_sync,
+            _process_image_sync_static,
             image_data,
-            url_hash
+            url_hash,
+            self.images_dir,
+            self.compression_params
         )
     
     async def _process_image_data(self, image_data: bytes, url_hash: str) -> Optional[ImageProcessingResult]:
@@ -844,9 +747,11 @@ class ImageProcessorWithEmbedding:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
             self.process_pool,
-            self._process_image_sync,
+            _process_image_sync_static,
             image_data,
-            url_hash
+            url_hash,
+            self.images_dir,
+            self.compression_params
         )
     
     def _update_image_metric(self, metric: ImageMetrics, success: bool, 
@@ -889,6 +794,101 @@ class ImageProcessorWithEmbedding:
             "avg_image_size_kb": (sum(m.size_kb for m in successful) / len(successful)) if successful else 0,
             "memory_cache_stats": cache_stats
         }
+
+
+def _process_image_sync_static(image_data: bytes, url_hash: str, images_dir: str, compression_params: list) -> Optional[ImageProcessingResult]:
+    """Синхронная обработка изображения (выполняется в отдельном процессе)"""
+    start_time = time.time()
+
+    try:
+        # Декодирование через OpenCV
+        nparr = np.frombuffer(image_data, np.uint8)
+        img_np = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if img_np is None:
+            # Попытка через PIL как запасной вариант
+            try:
+                with Image.open(BytesIO(image_data)) as img_pil:
+                    # Конвертация в RGB
+                    if img_pil.mode in ('RGBA', 'LA', 'P'):
+                        if img_pil.mode == 'RGBA':
+                            background = Image.new('RGB', img_pil.size, (255, 255, 255))
+                            background.paste(img_pil, mask=img_pil.split()[3])
+                            img_pil = background
+                        else:
+                            img_pil = img_pil.convert('RGB')
+                    elif img_pil.mode != 'RGB':
+                        img_pil = img_pil.convert('RGB')
+
+                    img_np = np.array(img_pil)
+                    img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
+            except Exception as e:
+                logger.debug(f"PIL decode failed: {e}")
+                return None
+
+        # Проверка валидности
+        if img_np.size == 0 or img_np.shape[0] == 0 or img_np.shape[1] == 0:
+            return None
+
+        # Получаем размеры
+        height, width = img_np.shape[:2]
+
+        # Масштабирование очень больших изображений
+        if width > 5000 or height > 5000:
+            scale = min(5000 / width, 5000 / height)
+            new_width = int(width * scale)
+            new_height = int(height * scale)
+            img_np = cv2.resize(img_np, (new_width, new_height), cv2.INTER_AREA)
+            height, width = img_np.shape[:2]
+
+        # Создание миниатюры
+        thumbnail_size = (120, 120)  # Default size
+        scale = min(thumbnail_size[0] / width, thumbnail_size[1] / height, 1.0)
+        new_width = int(width * scale)
+        new_height = int(height * scale)
+
+        # Выбор интерполяции
+        interpolation = cv2.INTER_AREA if scale < 0.5 else cv2.INTER_LINEAR
+        img_resized = cv2.resize(img_np, (new_width, new_height), interpolation=interpolation)
+
+        # Кодирование в base64
+        success, buffer = cv2.imencode('.jpg', img_resized, [
+            cv2.IMWRITE_JPEG_QUALITY, 85,
+            cv2.IMWRITE_JPEG_OPTIMIZE, 1
+        ])
+
+        if not success:
+            return None
+
+        base64_str = base64.b64encode(buffer.tobytes()).decode('utf-8')
+
+        # Сохранение оригинального изображения
+        timestamp = int(time.time() * 1000)
+        filename = f"photo_{url_hash}_{timestamp}.jpg"
+        filepath = os.path.join(images_dir, filename)
+
+        cv2.imwrite(filepath, img_np, compression_params)
+
+        # Получение размера файла
+        file_size_kb = os.path.getsize(filepath) / 1024
+        processing_time = time.time() - start_time
+
+        return ImageProcessingResult(
+            filepath=filepath,
+            base64_str=base64_str,
+            image_info={
+                "width": width,
+                "height": height,
+                "file_size_kb": file_size_kb,
+                "original_size": len(image_data),
+                "processing_time": processing_time,
+                "thumbnail_size": (new_width, new_height)
+            }
+        )
+
+    except Exception as e:
+        logger.debug(f"Error processing image {url_hash[:8]}: {e}")
+        return None
 
 
 async def process_images_batch(processor: ImageProcessorWithEmbedding, 
