@@ -1,0 +1,17 @@
+# Core dependencies
+aiohttp>=3.8.0
+aiofiles>=23.0.0
+numpy>=1.21.0
+Pillow>=9.0.0
+opencv-python>=4.5.0
+psutil>=5.8.0
+
+# For reports
+reportlab>=3.6.0
+openpyxl>=3.0.0
+
+# Optional performance enhancement
+uvloop>=0.17.0; platform_system != "Windows"
+
+# Logging and utilities
+colorama>=0.4.0
