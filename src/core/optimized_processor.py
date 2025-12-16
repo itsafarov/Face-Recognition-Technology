@@ -25,8 +25,8 @@ from .data_parser import parse_batch_records, get_global_parser
 from .checkpoint_manager import CheckpointManager
 from processing.image_processor import ImageProcessorWithEmbedding, process_images_batch, process_images_batch_simple
 from processing.report_generator import ReportGenerator
-from src.utils.logger import setup_logger
-from src.utils.memory_monitor import MemoryMonitor
+from utils.logger import setup_logger
+from utils.memory_monitor import MemoryMonitor
 
 logger = setup_logger()
 

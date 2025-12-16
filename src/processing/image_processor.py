@@ -1085,3 +1085,75 @@ class BatchImageProcessor:
                 gc.collect()
         
         return results
+
+def process_images_batch_simple(args):
+    """
+    Упрощенная функция пакетной обработки изображений для использования с multiprocessing
+    
+    Args:
+        args: Кортеж аргументов (urls, config_dict)
+        
+    Returns:
+        List[ImageProcessingResult]: Результаты обработки
+    """
+    try:
+        urls, config_dict = args
+        
+        # Создаем временный экземпляр ImageProcessorWithEmbedding с переданными параметрами
+        # Мы не можем передавать объекты с SSL-контекстами через multiprocessing, 
+        # поэтому создаем локальный процессор
+        import tempfile
+        from core.config import Config
+        from core.models import ProcessingMetrics
+        
+        # Создаем временный базовый каталог
+        temp_base_dir = config_dict.get("base_dir", tempfile.mkdtemp())
+        
+        # Создаем локальный процессор
+        local_processor = ImageProcessorWithEmbedding(temp_base_dir)
+        
+        # Создаем объект метрик
+        metrics = ProcessingMetrics()
+        
+        # Обрабатываем изображения
+        results = []
+        for url in urls:
+            try:
+                # Так как это запускается в отдельном процессе, используем asyncio.run
+                import asyncio
+                import ssl
+                # Обходим проблему SSL-контекста, создавая новый процессор
+                temp_processor = ImageProcessorWithEmbedding(tempfile.mkdtemp())
+                
+                # Создаем новый event loop для этого процесса
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                
+                try:
+                    # Выполняем асинхронную обработку
+                    async def process_url():
+                        # Настраиваем сессию без SSL контекста для этого процесса
+                        await temp_processor._initialize_session()
+                        result = await temp_processor.process_image(url, metrics)
+                        return result
+                    
+                    result = new_loop.run_until_complete(process_url())
+                    results.append(result)
+                finally:
+                    # Закрываем ресурсы
+                    new_loop.run_until_complete(temp_processor._close_resources())
+                    new_loop.close()
+                    
+            except Exception as e:
+                logger.error(f"Error processing image {url} in simple batch: {e}")
+                results.append(ImageProcessingResult("", "", {"failed_reason": str(e)}))
+        
+        # Закрываем ресурсы локального процессора
+        local_processor._close_resources()
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Error in process_images_batch_simple: {e}")
+        # Возвращаем список с ошибками для каждой URL
+        return [ImageProcessingResult("", "", {"failed_reason": str(e)}) for _ in urls]
