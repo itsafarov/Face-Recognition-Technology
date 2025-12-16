@@ -264,7 +264,7 @@ class ValueTransformer:
     @functools.lru_cache(maxsize=_cache_size)
     def transform_timestamp(value: Optional[str]) -> str:
         """Преобразование timestamp"""
-        if not value or value.lower() in ('null', 'none', 'nan', ''):
+        if not value or str(value).lower() in ('null', 'none', 'nan', ''):
             return "Н/Д"
         
         try:
@@ -349,7 +349,7 @@ class ValueTransformer:
     @functools.lru_cache(maxsize=_cache_size)
     def transform_score(value: Optional[str]) -> str:
         """Преобразование оценки"""
-        if not value or value.lower() in ('null', 'none', 'nan', ''):
+        if not value or str(value).lower() in ('null', 'none', 'nan', ''):
             return "Н/Д"
         
         try:
@@ -368,7 +368,7 @@ class ValueTransformer:
     @functools.lru_cache(maxsize=_cache_size)
     def transform_age(value: Optional[str]) -> str:
         """Преобразование возраста"""
-        if not value or value.lower() in ('null', 'none', 'nan', ''):
+        if not value or str(value).lower() in ('null', 'none', 'nan', ''):
             return "Н/Д"
         
         try:
